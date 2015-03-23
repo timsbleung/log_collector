@@ -7,18 +7,19 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.clients.producer.Producer;
+import org.apache.kafka.common.serialization.StringSerializer;
+
 import java.util.Properties;
-import kafka.javaapi.producer.*;
-import java.util.Properties;
-import kafka.producer.ProducerConfig;
-import kafka.producer.KeyedMessage;
 
 /**
  * Created by tl on 2/9/15.
  */
 public abstract class log_parser {
 
-    private static final boolean SEND_TO_KAFKA = false;
+    private static final boolean SEND_TO_KAFKA = true;
     private static final boolean OUTPUT_TO_FILE = true;
 
 
@@ -53,16 +54,14 @@ public abstract class log_parser {
 
     void send_to_kafka() {
         Properties props = new Properties();
-        ProducerConfig config = new ProducerConfig(props);
-        Producer<String, String> producer = new Producer<String, String>(config);
+        Producer<String, String> producer = new KafkaProducer<String, String>(props, new StringSerializer(), new StringSerializer());
 
         String[] lines = log.toString().split("\\n");
-        List<KeyedMessage<String, String> > messagelist = new ArrayList<KeyedMessage<String, String>>();
-        for(String s: lines) {
-            KeyedMessage<String, String> msg = new KeyedMessage<String, String>("log file", s);
-            messagelist.add(msg);
+
+        for(String msg: lines) {
+            String key = "";
+            producer.send(new ProducerRecord<String, String>("the-topic", key, msg));
         }
-        producer.send(messagelist);
         producer.close();
     }
 

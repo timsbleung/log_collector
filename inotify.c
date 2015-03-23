@@ -16,7 +16,7 @@
 void generate_shell(char* name, char* dir) {
     if (is_valid_log_file(name)) {
 
-        char * template = "#! /bin/bash\njava brolog_parser ";
+        char * template = "#! /bin/bash\njava -classpath \"libs/*:.\" log_parser ";
         int len = strnlen(name, MAX_STRNLEN)+strnlen(template, MAX_STRNLEN)+1+strnlen(dir, MAX_STRNLEN);
         char * script = malloc(len);
         strcpy(script, template);
