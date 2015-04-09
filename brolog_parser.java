@@ -12,6 +12,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import static java.nio.file.StandardCopyOption.*;
 
@@ -30,22 +31,26 @@ public class brolog_parser extends log_parser{
         }
         String separator = "\t";
         List<Integer> indices = get_fieldlist_indices(lines, separator, config);
+        System.out.println(indices);
         System.out.println("processing log...");
         int i = 0;
         for (i=starting_line; i<lines.size(); i++) {
             String line = lines.get(i);
             if (line.charAt(0)=='#')
                 continue;
-            append_line(line.split(separator), indices);
+            append_line(line.split(separator), indices, config);
         }
+        System.out.println("DONE");
         return i;
         //put column names on top
     }
 
-    private void append_line(String[] line, List<Integer> indices) {
+    private void append_line(String[] line, List<Integer> indices, List<String> config) {
+        int config_idx = 0;
+        HashMap<String, String> entry = new HashMap<>();
         for (int index : indices)
-            log.append(line[index]+"\t");
-        log.append('\n');
+            entry.put(config.get(config_idx++), line[index]);
+        logs.add(entry);
     }
 
     private static String get_separator(List<String> lines) throws Exception {
@@ -59,7 +64,7 @@ public class brolog_parser extends log_parser{
     private static List<Integer> get_fieldlist_indices(List<String> lines, String separator, List<String> config) throws Exception{
         for (String line : lines) {
             if (line.contains(fields_keyword)) {
-                 List<String> fields = Arrays.asList(line.substring(fields_keyword.length()+separator.length()).split(separator));
+                List<String> fields = Arrays.asList(line.substring(fields_keyword.length()+separator.length()).split(separator));
                 return get_indices(fields, config);
             }
         }

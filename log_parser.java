@@ -1,18 +1,20 @@
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.PrintWriter;
+import java.io.*;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.common.serialization.StringSerializer;
 
-import java.util.Properties;
+import java.io.File;
+import java.nio.file.*;
+
+import static java.nio.file.LinkOption.NOFOLLOW_LINKS;
+import static java.nio.file.StandardWatchEventKinds.ENTRY_CREATE;
+import static java.nio.file.StandardWatchEventKinds.ENTRY_MODIFY;
+import static java.nio.file.StandardWatchEventKinds.OVERFLOW;
 
 /**
  * Created by tl on 2/9/15.
@@ -23,7 +25,7 @@ public abstract class log_parser {
     private static final boolean OUTPUT_TO_FILE = true;
 
 
-    StringBuilder log = new StringBuilder();
+    protected List<Map<String, String>> logs;
 
     abstract int parse_log(String path, List<String> config, int starting_line) throws Exception;
     abstract void update_conf_file(File file, int new_idx);
@@ -38,22 +40,23 @@ public abstract class log_parser {
     }
 
     void output_to_file() {
-        PrintWriter out = null;
-        try {
-            out = new PrintWriter("./out/outlog.txt");
-            out.println(log.toString());
-            out.close();
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        }
-        finally {
-            if (out!=null)
-                out.close();
+        for (Map<String, String> entry : logs) {
+            System.out.println(map_to_string(entry));
         }
     }
 
+    static String map_to_string(Map<String, String> map) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("{");
+        for (Map.Entry<String, String> entry : map.entrySet())
+            sb.append("\"" + entry.getKey() + "\": \"" + entry.getValue() + "\", ");
+        sb.deleteCharAt(sb.length()-1); sb.deleteCharAt(sb.length()-1);
+        sb.append("}");
+        return sb.toString();
+    }
+
     void send_to_kafka() {
-        Properties props = new Properties();
+       /* Properties props = new Properties();
         Producer<String, String> producer = new KafkaProducer<String, String>(props, new StringSerializer(), new StringSerializer());
 
         String[] lines = log.toString().split("\\n");
@@ -63,14 +66,12 @@ public abstract class log_parser {
             producer.send(new ProducerRecord<String, String>("the-topic", key, msg));
         }
         producer.close();
+        */
     }
 
-    public static void main(String[] args) {
-
+    public static void log_event(String filename, String dir) {
         log_parser parser = new brolog_parser();
-
-        String filename = args[0];
-        String dir = args[1];
+        parser.logs = new ArrayList<>();
 
         String conf_name = dir+"/conf/"+filename.substring(0, filename.indexOf(".log"))+".conf";
 
@@ -101,10 +102,73 @@ public abstract class log_parser {
         }
         catch (Exception e) {
             System.out.println("unable to parse log "+e);
-            System.out.println(e.getStackTrace());
+            System.out.println(e.getStackTrace().toString());
         }
         parser.update_conf_file(config_file, new_line);
         parser.output_data();
         System.out.println("Took "+(System.currentTimeMillis() - start));
     }
+
+    public static void watch(String dir) throws Exception{
+        Path path = Paths.get(dir);
+        System.out.println("watching "+path.toAbsolutePath().toString());
+
+        FileSystem fs = path.getFileSystem();
+
+        try(WatchService service = fs.newWatchService()) {
+
+            // We register the path to the service
+            // We watch for creation events
+            path.register(service, ENTRY_MODIFY, ENTRY_CREATE);
+
+            // Start the infinite polling loop
+            WatchKey key = null;
+            while(true) {
+                key = service.take();
+
+                // Dequeueing events
+                WatchEvent.Kind<?> kind = null;
+                for(WatchEvent<?> watchEvent : key.pollEvents()) {
+                    // Get the type of the event
+                    kind = watchEvent.kind();
+                    if (OVERFLOW == kind) {
+                        continue; //loop
+                    } else if (ENTRY_MODIFY == kind || ENTRY_CREATE == kind) {
+                        // A new Path was created
+                        Path newPath = ((WatchEvent<Path>) watchEvent).context();
+
+                        String fname = newPath.toString();
+                        System.out.println("File "+fname+" touched");
+                        if (fname.endsWith(".log.gz"))
+                            decompressGzipFile(fname);
+                        else if (fname.endsWith(".log"))
+                            log_event(fname, dir);
+
+
+                    }
+                }
+
+                if(!key.reset()) {
+                    break; //loop
+                }
+            }
+
+        } catch(IOException ioe) {
+            ioe.printStackTrace();
+        } catch(InterruptedException ie) {
+            ie.printStackTrace();
+        }
+    }
+
+    public static void main(String[] args) throws Exception{
+        watch(args[0]);
+    }
+
+
+    private static void decompressGzipFile(String compressedFile) throws Exception{
+        Process p = Runtime.getRuntime().exec("tar -xf "+compressedFile);
+        p.waitFor();
+    }
+
+
 }
