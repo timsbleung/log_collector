@@ -1,8 +1,10 @@
 import java.io.*;
+import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.util.*;
 
+import com.google.gson.Gson;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.Producer;
@@ -30,6 +32,9 @@ public abstract class log_parser {
     abstract int parse_log(String path, List<String> config, int starting_line) throws Exception;
     abstract void update_conf_file(File file, int new_idx);
     abstract void generate_config_file(File file) throws Exception;
+    abstract List<String> get_config_strings(List<String> config_lines) throws Exception;
+    abstract int get_starting_line(List<String> config_lines) throws Exception;
+
 
 
     void output_data() {
@@ -37,6 +42,17 @@ public abstract class log_parser {
             output_to_file();
         if (SEND_TO_KAFKA)
             send_to_kafka();
+    }
+
+    private static String get_kafka_IP() throws Exception{
+        URL url = new URL("http://vivaldi.crhc.illinois.edu:4001/v2/keys/services/kafka");
+        String kafkaIP = "";
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream(), "UTF-8"))) {
+            String line = reader.readLine();
+            Map<String, Object> values = new Gson().fromJson(line, Map.class);
+            kafkaIP = (String )((Map<String, Object>)values.get("node")).get("value");
+        }
+        return kafkaIP;
     }
 
     void output_to_file() {
@@ -57,6 +73,14 @@ public abstract class log_parser {
 
     void send_to_kafka() {
         Properties props = new Properties();
+        String kafkaIP = null;
+        try {
+            kafkaIP = get_kafka_IP();
+        } catch (Exception e) {
+            System.out.println("unable to get kafka IP address "+e);
+            return;
+        }
+        props.put("bootstrap.servers", kafkaIP);
         Producer<String, String> producer = new KafkaProducer(props, new StringSerializer(), new StringSerializer());
 
 
@@ -86,24 +110,40 @@ public abstract class log_parser {
             }
 
 
-        List<String> lines = new ArrayList<String>();
+        List<String> config_lines = new ArrayList<String>();
         try {
-            lines = Files.readAllLines(config_file.toPath(), Charset.defaultCharset());
+            config_lines = Files.readAllLines(config_file.toPath(), Charset.defaultCharset());
         } catch(Exception e) {
-            System.out.println("Invalid file read"+e);
+            System.out.println("Invalid file read for config_strings"+e);
+            return;
         }
-        String path = dir+"/"+filename;
-        List<String> config = Arrays.asList(lines.get(0).split("\t"));
-        int starting_line = Integer.parseInt(lines.get(1));
-        int new_line = 0;
+
+        List<String> config_strings = null;
         try {
-            new_line = parser.parse_log(path, config, starting_line);
+            config_strings = parser.get_config_strings(config_lines);
+        } catch (Exception e) {
+            System.out.println("Unable to parse config_strings file for strings" + e);
+            return;
+        }
+
+        int starting_line = 0;
+        try {
+            starting_line = parser.get_starting_line(config_lines);
+        } catch (Exception e) {
+            System.out.println("Unable to parse config_strings file for starting line" + e);
+            return;
+        }
+
+        String path = dir+"/"+filename;
+        int lines_parsed = 0;
+        try {
+            lines_parsed = parser.parse_log(path, config_strings, starting_line);
         }
         catch (Exception e) {
             System.out.println("unable to parse log "+e);
             System.out.println(e.getStackTrace().toString());
         }
-        parser.update_conf_file(config_file, new_line);
+        parser.update_conf_file(config_file, lines_parsed);
         parser.output_data();
         System.out.println("Took "+(System.currentTimeMillis() - start));
     }
@@ -142,8 +182,6 @@ public abstract class log_parser {
                             decompressGzipFile(fname);
                         else if (fname.endsWith(".log"))
                             log_event(fname, dir);
-
-
                     }
                 }
 

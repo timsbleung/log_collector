@@ -98,6 +98,16 @@ public class brolog_parser extends log_parser{
         }
     }
 
+    public List<String> get_config_strings(List<String> config_lines) throws Exception{
+        List<String> config = Arrays.asList(config_lines.get(0).split("\t"));
+        return config;
+    }
+
+    public int get_starting_line(List<String> config_lines) throws Exception {
+        return Integer.parseInt(config_lines.get(1));
+    }
+
+
     public void generate_config_file(File file) throws Exception{
         File template = new File("./conf/templates/bro_template.conf");
         Files.copy(template.toPath(), file.toPath(), REPLACE_EXISTING);
