@@ -6,7 +6,7 @@ import java.util.*;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.Producer;
-import org.apache.kafka.common.serialization.StringSerializer;
+import org.apache.kafka.common.serialization.*;
 
 import java.io.File;
 import java.nio.file.*;
@@ -56,17 +56,16 @@ public abstract class log_parser {
     }
 
     void send_to_kafka() {
-       /* Properties props = new Properties();
-        Producer<String, String> producer = new KafkaProducer<String, String>(props, new StringSerializer(), new StringSerializer());
+        Properties props = new Properties();
+        Producer<String, String> producer = new KafkaProducer(props, new StringSerializer(), new StringSerializer());
 
-        String[] lines = log.toString().split("\\n");
 
-        for(String msg: lines) {
+        for (Map<String, String> entry : logs) {
             String key = "";
+            String msg = map_to_string(entry);
             producer.send(new ProducerRecord<String, String>("the-topic", key, msg));
         }
         producer.close();
-        */
     }
 
     public static void log_event(String filename, String dir) {

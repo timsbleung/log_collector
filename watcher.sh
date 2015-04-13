@@ -1,3 +1,3 @@
 #!/bin/bash
 
-java -cp ".:libs/" log_parser $1
+java -cp ".:libs/*" log_parser $1
