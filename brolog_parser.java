@@ -15,6 +15,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import static java.nio.file.StandardCopyOption.*;
+import java.security.MessageDigest;
 
 public class brolog_parser extends log_parser{
 
@@ -31,26 +32,47 @@ public class brolog_parser extends log_parser{
         }
         String separator = "\t";
         List<Integer> indices = get_fieldlist_indices(lines, separator, config);
-        System.out.println(indices);
-        System.out.println("processing log...");
+        //System.out.println("processing log...");
         int i = 0;
         for (i=starting_line; i<lines.size(); i++) {
             String line = lines.get(i);
-            if (line.charAt(0)=='#')
+            if (line.length()==0 || line.charAt(0)=='#')
                 continue;
             append_line(line.split(separator), indices, config);
         }
-        System.out.println("DONE");
+        //System.out.println("DONE");
         return i;
         //put column names on top
     }
 
     private void append_line(String[] line, List<Integer> indices, List<String> config) {
-        int config_idx = 0;
-        HashMap<String, String> entry = new HashMap<>();
-        for (int index : indices)
-            entry.put(config.get(config_idx++), line[index]);
-        logs.add(entry);
+		if (!line[0].equals("close")) {
+			MessageDigest hasher;
+			try {
+				hasher = MessageDigest.getInstance("MD5");
+			}
+			catch (Exception e) {
+				System.out.println("unable to get hasher "+e);
+				return;
+			}
+			log_packet entry = new log_packet();
+			int config_idx = 0;
+			for (int index : indices) {
+				//TODO NOT MAGIC NUMBERS
+				try {
+					entry.metadata.put(config.get(config_idx++), line[index]);
+					entry.timestamp = line[0];
+					entry.event = line[10];
+					entry.source = "BRO";
+					entry.user = line[2] + ":" + line[3];
+					entry.eventid = hasher.digest((entry.timestamp + entry.event + entry.user).getBytes()).toString();
+				}
+				catch (Exception e) {
+					System.out.println(Arrays.toString(line));
+				}
+			}
+			logs.add(entry);
+		}
     }
 
     private static String get_separator(List<String> lines) throws Exception {

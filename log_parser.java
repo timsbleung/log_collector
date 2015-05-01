@@ -23,14 +23,14 @@ import static java.nio.file.StandardWatchEventKinds.OVERFLOW;
  */
 public abstract class log_parser {
 
-    private static final boolean SEND_TO_KAFKA = true;
+    private static final boolean SEND_TO_KAFKA = false;
     private static final boolean OUTPUT_TO_FILE = true;
 
     //the address that we should query for the kafka server IP address
     public static final String QUERY_ADDRESS = "http://vivaldi.crhc.illinois.edu:4001/v2/keys/services/kafka";
 
     //a map that contains the columns we want from the log, mapping the column names to values for each entry in the log
-    protected List<Map<String, String>> logs;
+    protected List<log_packet> logs;
 
 
     /****************************************************************************
@@ -111,8 +111,8 @@ public abstract class log_parser {
      * A file that currently just prints out the json strings
      */
     void output_to_file() {
-        for (Map<String, String> entry : logs) {
-            System.out.println(map_to_string(entry));
+        for (log_packet entry : logs) {
+            entry.get_string();
         }
     }
 
@@ -147,9 +147,9 @@ public abstract class log_parser {
         Producer<String, String> producer = new KafkaProducer(props, new StringSerializer(), new StringSerializer());
 
 
-        for (Map<String, String> entry : logs) {
+        for (log_packet entry : logs) {
             String key = "";
-            String msg = map_to_string(entry);
+            String msg = entry.get_string();
             producer.send(new ProducerRecord<String, String>("the-topic", key, msg));
         }
         producer.close();
@@ -223,13 +223,13 @@ public abstract class log_parser {
         }
         catch (Exception e) {
             System.out.println("unable to parse log "+e);
-            System.out.println(e.getStackTrace().toString());
+            e.printStackTrace();
         }
 
         //update teh configuration file to note where you have parsed up to on this iteration of the parsing
         parser.update_conf_file(config_file, lines_parsed);
         parser.output_data();
-        System.out.println("Took "+(System.currentTimeMillis() - start));
+        System.out.println(System.currentTimeMillis());
     }
 
     /**
@@ -269,7 +269,7 @@ public abstract class log_parser {
                         Path newPath = ((WatchEvent<Path>) watchEvent).context();
 
                         String fname = newPath.toString();
-                        System.out.println("File "+fname+" touched");
+                        //System.out.println("File "+fname+" touched");
                         if (fname.endsWith(".log.gz"))
                             decompressGzipFile(fname);
                         else if (fname.endsWith(".log"))
