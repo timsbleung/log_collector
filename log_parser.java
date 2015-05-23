@@ -117,21 +117,6 @@ public abstract class log_parser {
     }
 
     /**
-     * A simple function that takes a map<String, String> and spits out the corresponding json string
-     * @param map
-     * @return a JSON formatted string
-     */
-    static String map_to_string(Map<String, String> map) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("{");
-        for (Map.Entry<String, String> entry : map.entrySet())
-            sb.append("\"" + entry.getKey() + "\": \"" + entry.getValue() + "\", ");
-        sb.deleteCharAt(sb.length()-1); sb.deleteCharAt(sb.length()-1);
-        sb.append("}");
-        return sb.toString();
-    }
-
-    /**
      * send the data to the kafka server
      */
     void send_to_kafka() {
