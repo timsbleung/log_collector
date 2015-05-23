@@ -45,7 +45,7 @@ public class brolog_parser extends log_parser{
         //put column names on top
     }
 
-    private void append_line(String[] line, List<Integer> indices, List<String> config) {
+    private void append_line(String[] line, List<Integer> indices, List<String> config) throws Exception {
 		if (!line[0].equals("close")) {
 			MessageDigest hasher;
 			try {
@@ -57,18 +57,24 @@ public class brolog_parser extends log_parser{
 			}
 			log_packet entry = new log_packet();
 			int config_idx = 0;
-			for (int index : indices) {
-				//TODO NOT MAGIC NUMBERS
-				try {
-					entry.metadata.put(config.get(config_idx++), line[index]);
-					entry.timestamp = line[0];
+            try {
+				    //TODO NOT MAGIC NUMBERS
+                    entry.timestamp = line[0];
 					entry.event = line[10];
 					entry.source = "BRO";
 					entry.user = line[2] + ":" + line[3];
 					entry.eventid = hasher.digest((entry.timestamp + entry.event + entry.user).getBytes()).toString();
+
+            }
+            catch (Exception e) {
+                throw new Exception("unable to find separator");
+			}
+			for (int index : indices) {
+				try {
+					entry.metadata.put(config.get(config_idx++), line[index]);
 				}
 				catch (Exception e) {
-					System.out.println(Arrays.toString(line));
+                    throw new Exception("unable to find separator");
 				}
 			}
 			logs.add(entry);

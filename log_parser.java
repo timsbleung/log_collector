@@ -112,7 +112,7 @@ public abstract class log_parser {
      */
     void output_to_file() {
         for (log_packet entry : logs) {
-            entry.get_string();
+            System.out.println(entry.get_string());
         }
     }
 
